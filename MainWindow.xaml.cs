@@ -374,8 +374,11 @@ public partial class MainWindow : Window
     private void AfterCloseEditor()
     {
         EditButton.IsEnabled = true;
+        if (editorWindow != null)
+            editorWindow.changed = false;
         editorWindow?.Close();
         editorWindow = null;
+        Focus();
     }
 
     private void PauseButton_OnClick(object sender, RoutedEventArgs e) => Pause();
