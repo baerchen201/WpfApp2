@@ -20,6 +20,8 @@
         </DockPanel>
         <Canvas Grid.Row="1" Name="MainCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" MinWidth="100"
                 MinHeight="100">
+            <Rectangle Name="Finish" Fill="DarkRed" Canvas.Right="0" Width="30"
+                       Height="{Binding Path=ActualHeight, ElementName=MainCanvas}" />
             <Image Name="PlayerImage" Source="player.png" Width="20" Height="20" />
         </Canvas>
     </Grid>

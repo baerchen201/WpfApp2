@@ -3,6 +3,8 @@ using System.Numerics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
@@ -19,9 +21,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         running = true;
-        player = new Player(this);
-        globals = new _Globals(new _Player(player));
-        currentCode = "Player.Move(Input)";
+        player = new Player(this, PlayerImage);
+        globals = new _Globals(this, player, Finish);
+        currentCode =
+            "Player.Move(Input);\nif (Keyboard.IsKeyDown(Key.Space))\n    Finish.Activate();";
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000 / 30) };
         timer.Tick += OnTimerTick;
         timer.Start();
@@ -37,10 +40,62 @@ public partial class MainWindow : Window
     private static readonly TimeSpan timeout = TimeSpan.FromSeconds(1);
 
     [SuppressMessage("ReSharper", "MemberHidesStaticFromOuterClass")]
-    public class _Globals(_Player player)
+    public class _Globals(MainWindow window, Player player, FrameworkElement finish)
     {
-        public readonly _Player Player = player;
+        public readonly _Player Player = new(player);
+        public readonly _ToggleableElement Finish = new(window, finish, _updateFinish);
         public Vector2 Input { get; internal set; }
+    }
+
+    public static void _updateFinish(FrameworkElement finish, bool active)
+    {
+        ((Rectangle)finish).Fill = new SolidColorBrush(active ? Colors.Lime : Colors.DarkRed);
+    }
+
+    public abstract class _Updatable(MainWindow window)
+    {
+        internal virtual void Update() { }
+
+        internal virtual void PostUpdate() { }
+    }
+
+    public class _Element : _Updatable
+    {
+        internal _Element(MainWindow window, FrameworkElement element)
+            : base(window)
+        {
+            this.element = element;
+        }
+
+        private readonly FrameworkElement element;
+
+        internal FrameworkElement Element => element;
+    }
+
+    internal List<_Updatable> updates = [];
+
+    public class _ToggleableElement : _Element
+    {
+        internal _ToggleableElement(
+            MainWindow window,
+            FrameworkElement element,
+            Action<FrameworkElement, bool> update
+        )
+            : base(window, element)
+        {
+            this.update = update;
+            window.updates.Add(this);
+        }
+
+        private bool active;
+        public bool Active => active;
+        private readonly Action<FrameworkElement, bool> update;
+
+        internal override void Update() => update(Element, active);
+
+        internal override void PostUpdate() => active = false;
+
+        public void Activate() => active = true;
     }
 
     public class _Player(Player player)
@@ -59,18 +114,25 @@ public partial class MainWindow : Window
 
         public void Move(Vector2 movement) => player.Move(movement);
 
+        public bool Colliding(_Element other) => player.Colliding(other.Element);
+
+        public bool Colliding(Vector2 otherPosition, Vector2 otherSize) =>
+            player.Colliding(otherPosition, otherSize);
+
         public override string ToString() => $"Player(X:{X}, Y:{Y})";
     }
 
     public class Player
     {
-        internal Player(MainWindow window)
+        internal Player(MainWindow window, FrameworkElement playerElement)
         {
             this.window = window;
+            this.playerElement = playerElement;
             Reset();
         }
 
         private readonly MainWindow window;
+        private readonly FrameworkElement playerElement;
 
         internal void Reset()
         {
@@ -90,6 +152,40 @@ public partial class MainWindow : Window
                 0f,
                 (float)(window.MainCanvas.ActualHeight - window.PlayerImage.ActualHeight)
             );
+        }
+
+        public bool Colliding(FrameworkElement other)
+        {
+            double left = Canvas.GetLeft(other),
+                right = Canvas.GetRight(other),
+                top = Canvas.GetTop(other),
+                bottom = Canvas.GetBottom(other);
+            double oX = double.IsNaN(left)
+                    ? double.IsNaN(right)
+                        ? 0d
+                        : ((Canvas)other.Parent).ActualWidth - right - other.ActualWidth
+                    : left,
+                oY = double.IsNaN(top)
+                    ? double.IsNaN(bottom)
+                        ? 0d
+                        : ((Canvas)other.Parent).ActualHeight - bottom - other.ActualHeight
+                    : top;
+            return Colliding(
+                new Vector2((float)oX, (float)oY),
+                new Vector2((float)other.ActualWidth, (float)other.ActualHeight)
+            );
+        }
+
+        public bool Colliding(Vector2 otherPosition, Vector2 otherSize)
+        {
+            float mX = x + (float)playerElement.ActualWidth,
+                mY = y + (float)playerElement.ActualHeight,
+                oX = otherPosition.X,
+                oY = otherPosition.Y,
+                omX = oX + otherSize.X,
+                omY = oY + otherSize.Y;
+
+            return !(mX <= oX || omX <= x || mY <= oY || omY <= y);
         }
 
         public float x;
@@ -112,8 +208,33 @@ public partial class MainWindow : Window
         else
             DefaultUpdate();
 
+        updates.ForEach(i => i.Update());
+        if (globals.Finish.Active && player.Colliding(Finish))
+            GameEnd();
+        updates.ForEach(i => i.PostUpdate());
         Canvas.SetLeft(PlayerImage, player.x);
         Canvas.SetTop(PlayerImage, player.y);
+    }
+
+    private void GameEnd()
+    {
+        timer.Stop();
+        running = false;
+        PauseButton.IsEnabled = false;
+        ResumeButton.IsEnabled = false;
+        EditButton.IsEnabled = false;
+        if (editorWindow != null)
+            editorWindow.changed = false;
+        editorWindow?.Close();
+        editorWindow = null;
+        MessageBox.Show(
+            this,
+            "You Win",
+            "GameEnd",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information
+        );
+        Close();
     }
 
     private Vector2 GetInput()
@@ -139,12 +260,14 @@ public partial class MainWindow : Window
             h = Math.Sign(h) * 0.71f;
         }
 
-        return new Vector2(h, v);
+        return new Vector2(h, v) * 2.5f;
     }
 
     private void DefaultUpdate()
     {
         globals.Player.Move(globals.Input);
+        if (Keyboard.IsKeyDown(Key.Space))
+            globals.Finish.Activate();
     }
 
     public void Pause()
@@ -224,7 +347,7 @@ public partial class MainWindow : Window
             code,
             ScriptOptions
                 .Default.WithReferences(GetType().Assembly)
-                .WithImports("System", "System.Numerics"),
+                .WithImports("System", "System.Numerics", "System.Windows.Input"),
             typeof(_Globals)
         );
         if (!CompilationError(_script.Compile()))
