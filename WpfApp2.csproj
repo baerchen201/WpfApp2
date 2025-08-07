@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="player.png" />
+    <Resource Include="music.wav" />
   </ItemGroup>
 </Project>

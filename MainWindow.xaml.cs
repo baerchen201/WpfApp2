@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Media;
 using System.Numerics;
 using System.Windows;
 using System.Windows.Controls;
@@ -25,9 +26,20 @@ public partial class MainWindow : Window
         globals = new _Globals(this, player, Finish);
         currentCode =
             "Player.Move(Input);\nif (Keyboard.IsKeyDown(Key.Space))\n    Finish.Activate();";
+        mediaplayer = new SoundPlayer();
+        PlaySound();
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000 / 30) };
         timer.Tick += OnTimerTick;
         timer.Start();
+    }
+
+    private void PlaySound()
+    {
+        var stream = Application.GetResourceStream(new Uri("pack://application:,,,/music.wav"));
+        if (stream == null)
+            return;
+        mediaplayer.Stream = stream.Stream;
+        mediaplayer.Play();
     }
 
     public bool running;
@@ -73,6 +85,7 @@ public partial class MainWindow : Window
     }
 
     internal List<_Updatable> updates = [];
+    private readonly SoundPlayer mediaplayer;
 
     public class _ToggleableElement : _Element
     {
@@ -227,6 +240,7 @@ public partial class MainWindow : Window
             editorWindow.changed = false;
         editorWindow?.Close();
         editorWindow = null;
+        mediaplayer.Stop();
         MessageBox.Show(
             this,
             "You Win",
@@ -275,6 +289,7 @@ public partial class MainWindow : Window
         running = false;
         PauseButton.IsEnabled = false;
         ResumeButton.IsEnabled = true;
+        mediaplayer.Stop();
     }
 
     public void Resume()
@@ -282,6 +297,8 @@ public partial class MainWindow : Window
         running = true;
         PauseButton.IsEnabled = true;
         ResumeButton.IsEnabled = false;
+        mediaplayer.Stop();
+        mediaplayer.PlayLooping();
     }
 
     public void OpenEditor()
