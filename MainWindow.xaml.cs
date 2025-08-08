@@ -298,7 +298,8 @@ public partial class MainWindow : Window
         PauseButton.IsEnabled = true;
         ResumeButton.IsEnabled = false;
         mediaplayer.Stop();
-        mediaplayer.PlayLooping();
+        if (musicEnabled)
+            mediaplayer.PlayLooping();
     }
 
     public void OpenEditor()
@@ -386,4 +387,17 @@ public partial class MainWindow : Window
     private void ResumeButton_OnClick(object sender, RoutedEventArgs e) => Resume();
 
     private void EditButton_OnClick(object sender, RoutedEventArgs e) => OpenEditor();
+
+    private bool musicEnabled = true;
+
+    public void ToggleMusic(bool enable)
+    {
+        musicEnabled = enable;
+        if (running)
+            Resume();
+    }
+
+    private void MuteButton_OnChecked(object sender, RoutedEventArgs e) => ToggleMusic(false);
+
+    private void MuteButton_OnUnchecked(object sender, RoutedEventArgs e) => ToggleMusic(true);
 }

@@ -16,6 +16,7 @@
                 <MenuItem Header="_Pause" Name="PauseButton" Click="PauseButton_OnClick" />
                 <MenuItem Header="_Resume" IsEnabled="False" Name="ResumeButton" Click="ResumeButton_OnClick" />
                 <MenuItem Header="Edit" Name="EditButton" Click="EditButton_OnClick" />
+                <CheckBox Name="MuteButton" Checked="MuteButton_OnChecked" Unchecked="MuteButton_OnUnchecked">Mute music</CheckBox>
             </Menu>
         </DockPanel>
         <Canvas Grid.Row="1" Name="MainCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" MinWidth="100"
